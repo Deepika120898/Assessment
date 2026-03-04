@@ -1,0 +1,105 @@
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(pharmaverseadam)
+})
+
+dir.create("question_3_tlg", showWarnings = FALSE, recursive = TRUE)
+
+adae <- pharmaverseadam::adae
+
+plot1_df <- adae %>%
+  filter(TRTEMFL == "Y") %>%
+  filter(!is.na(ACTARM), !is.na(AESEV)) %>%
+  count(ACTARM, AESEV, name = "n") %>%
+  mutate(
+    ACTARM = factor(
+      ACTARM,
+      levels = c("Placebo", "Xanomeline High Dose", "Xanomeline Low Dose")
+    ),
+    AESEV = factor(
+      AESEV,
+      levels = c("MILD", "MODERATE", "SEVERE")
+    )
+  )
+
+#plot
+p1 <- ggplot(plot1_df, aes(x = ACTARM, y = n, fill = AESEV)) +
+  geom_col() +
+  labs(
+    title = "AE severity distribution by treatment",
+    x = "Treatment Arm",
+    y = "Count of AEs",
+    fill = "Severity/Intensity"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    legend.title = element_text(face = "bold")
+  )
+
+#output
+ggsave(
+  filename = "question_3_tlg/ae_severity_distribution.png",
+  plot = p1,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+
+cat("Plot 1 created successfully:\n")
+cat(" - question_3_tlg/ae_severity_distribution.png\n")
+
+
+# Plot 2
+
+plot2_df <- adae %>%
+  filter(TRTEMFL == "Y", !is.na(USUBJID), !is.na(AETERM)) %>%
+  distinct(USUBJID, AETERM) %>%
+  count(AETERM, name = "n") %>%
+  arrange(desc(n), AETERM) %>%
+  slice_head(n = 10)
+
+plot2_df <- plot2_df %>%
+  rowwise() %>%
+  mutate(
+    pct = 100 * n / denom_n,
+    lower = 100 * binom.test(n, denom_n)$conf.int[1],
+    upper = 100 * binom.test(n, denom_n)$conf.int[2]
+  ) %>%
+  ungroup() %>%
+  mutate(
+    AETERM = forcats::fct_reorder(AETERM, pct)
+  )
+
+p2 <- ggplot(plot2_df, aes(x = pct, y = AETERM)) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(xmin = lower, xmax = upper),
+    width = 0.2,
+    orientation = "y"
+  ) +
+  labs(
+    title = "Top 10 Most Frequent Adverse Events",
+    subtitle = paste0("n = ", denom_n, " subjects; 95% exact CIs"),
+    x = "Percentage of Patients (%)",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 14)
+
+ggsave(
+  "question_3_tlg/top10_frequent_aes.png",
+  plot = p2,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+
+
+
+
+
+===== OUTPUT =====
+Plot 1 created successfully:
+ - question_3_tlg/ae_severity_distribution.png
